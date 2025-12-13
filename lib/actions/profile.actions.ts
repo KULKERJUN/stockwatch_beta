@@ -8,25 +8,26 @@ import { headers } from 'next/headers';
 export const getUserProfile = async () => {
     try {
         const session = await auth.api.getSession({ headers: await headers() });
-        
+
         if (!session?.user) {
             return { success: false, error: 'Not authenticated' };
         }
 
         await connectToDatabase();
-        
-        let profile = await UserProfile.findOne({ userId: session.user.id });
+
+        let profile = await UserProfile.findOne({ userId: session.user.id }).lean();
 
         // If profile doesn't exist, create one with basic info
         if (!profile) {
-            profile = await UserProfile.create({
+            const newProfile = await UserProfile.create({
                 userId: session.user.id,
                 name: session.user.name || '',
                 email: session.user.email || '',
             });
+            profile = await UserProfile.findById(newProfile._id).lean();
         }
 
-        return { success: true, data: profile };
+        return { success: true, data: JSON.parse(JSON.stringify(profile)) };
     } catch (error) {
         console.error('Error getting user profile:', error);
         return { success: false, error: 'Failed to get user profile' };
@@ -40,13 +41,13 @@ export const updateUserProfile = async (data: {
 }) => {
     try {
         const session = await auth.api.getSession({ headers: await headers() });
-        
+
         if (!session?.user) {
             return { success: false, error: 'Not authenticated' };
         }
 
         await connectToDatabase();
-        
+
         const updateData: { bio?: string; name?: string; email?: string } = {};
         if (data.bio !== undefined) updateData.bio = data.bio;
         if (data.name !== undefined) updateData.name = data.name;
@@ -90,9 +91,9 @@ export const updateUserProfile = async (data: {
             { userId: session.user.id },
             updateData,
             { new: true, upsert: true }
-        );
+        ).lean();
 
-        return { success: true, data: profile };
+        return { success: true, data: JSON.parse(JSON.stringify(profile)) };
     } catch (error) {
         console.error('Error updating user profile:', error);
         return { success: false, error: 'Failed to update user profile' };
@@ -105,7 +106,7 @@ export const changePassword = async (data: {
 }) => {
     try {
         const session = await auth.api.getSession({ headers: await headers() });
-        
+
         if (!session?.user) {
             return { success: false, error: 'Not authenticated' };
         }
@@ -131,11 +132,11 @@ export const changePassword = async (data: {
                     newPassword: data.newPassword,
                 },
             });
-            
+
             if (!result) {
                 throw new Error('Password change failed');
             }
-            
+
             return { success: true };
         } catch (error: any) {
             console.error('Error changing password:', error);
@@ -167,15 +168,15 @@ export const updateAccountSettings = async (data: {
 }) => {
     try {
         const session = await auth.api.getSession({ headers: await headers() });
-        
+
         if (!session?.user) {
             return { success: false, error: 'Not authenticated' };
         }
 
         await connectToDatabase();
-        
+
         const profile = await UserProfile.findOne({ userId: session.user.id });
-        
+
         if (!profile) {
             return { success: false, error: 'Profile not found' };
         }
@@ -206,9 +207,9 @@ export const updateAccountSettings = async (data: {
             { userId: session.user.id },
             { settings: updatedSettings },
             { new: true }
-        );
+        ).lean();
 
-        return { success: true, data: updatedProfile };
+        return { success: true, data: JSON.parse(JSON.stringify(updatedProfile)) };
     } catch (error) {
         console.error('Error updating account settings:', error);
         return { success: false, error: 'Failed to update account settings' };
@@ -226,7 +227,7 @@ export const createUserProfile = async (data: {
 }) => {
     try {
         await connectToDatabase();
-        
+
         const profile = await UserProfile.findOneAndUpdate(
             { userId: data.userId },
             {
@@ -239,9 +240,9 @@ export const createUserProfile = async (data: {
                 preferredIndustry: data.preferredIndustry,
             },
             { new: true, upsert: true }
-        );
+        ).lean();
 
-        return { success: true, data: profile };
+        return { success: true, data: JSON.parse(JSON.stringify(profile)) };
     } catch (error) {
         console.error('Error creating user profile:', error);
         return { success: false, error: 'Failed to create user profile' };
