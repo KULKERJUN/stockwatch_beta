@@ -5,12 +5,14 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import SelectField from '@/components/forms/SelectField';
-import { getUserProfile, updateUserProfile, changePassword, updateAccountSettings } from '@/lib/actions/profile.actions';
+import { getUserProfile, updateUserProfile, changePassword, updateAccountSettings, getWatchlist } from '@/lib/actions/profile.actions';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2 } from 'lucide-react';
 import countryList from 'react-select-country-list';
 import { Controller } from 'react-hook-form';
+import Link from 'next/link';
+import WatchlistButton from '@/components/WatchlistButton';
 
 type ProfileFormData = {
     bio: string;
@@ -45,6 +47,7 @@ type UserProfileData = {
     investmentGoals?: string;
     riskTolerance?: string;
     preferredIndustry?: string;
+    watchlist?: string[];
     settings?: {
         notifications?: {
             priceAlerts?: boolean;
@@ -73,6 +76,7 @@ const ProfilePage = () => {
     const [isChangingPassword, setIsChangingPassword] = useState(false);
     const [isEditingSettings, setIsEditingSettings] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [watchlist, setWatchlist] = useState<string[]>([]);
     
     const getCountryName = (countryCode: string | undefined) => {
         if (!countryCode) return '';
@@ -135,7 +139,21 @@ const ProfilePage = () => {
             }
         };
 
+        const loadWatchlist = async () => {
+            try {
+                const result = await getWatchlist();
+                if (result.success && result.data) {
+                    setWatchlist(result.data);
+                } else {
+                    console.error('Failed to load watchlist:', result.error);
+                }
+            } catch (error) {
+                console.error('Error loading watchlist:', error);
+            }
+        };
+
         loadProfile();
+        loadWatchlist();
     }, [profileForm, settingsForm]);
 
     const onProfileSubmit = async (data: ProfileFormData) => {
@@ -236,6 +254,24 @@ const ProfilePage = () => {
         } finally {
             setIsSaving(false);
         }
+    };
+
+    const refreshWatchlist = async () => {
+        try {
+            const result = await getWatchlist();
+            if (result.success && result.data) {
+                setWatchlist(result.data);
+            } else {
+                console.error('Failed to refresh watchlist:', result.error);
+            }
+        } catch (error) {
+            console.error('Error refreshing watchlist:', error);
+        }
+    };
+
+    const handleWatchlistChange = async (symbol: string, isAdded: boolean) => {
+        // Always refresh from server to ensure consistency
+        await refreshWatchlist();
     };
 
     if (loading) {
@@ -555,6 +591,73 @@ const ProfilePage = () => {
                             )}
                         </div>
                         <p className="text-xs text-gray-500 mt-4">These preferences were set during sign-up and cannot be changed here</p>
+                    </div>
+                )}
+            </div>
+
+            {/* Watchlist Section */}
+            <div className="bg-gray-900 rounded-lg border border-gray-800 p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 className="text-2xl font-semibold text-gray-100">Watchlist</h2>
+                        <p className="text-gray-400 mt-1">
+                            {watchlist.length === 0 
+                                ? 'No stocks in your watchlist yet' 
+                                : `${watchlist.length} ${watchlist.length === 1 ? 'stock' : 'stocks'} in your watchlist`}
+                        </p>
+                    </div>
+                    {watchlist.length > 0 && (
+                        <Link href="/watchlist">
+                            <Button
+                                variant="outline"
+                                className="border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-yellow-500"
+                            >
+                                View All
+                            </Button>
+                        </Link>
+                    )}
+                </div>
+
+                {watchlist.length === 0 ? (
+                    <div className="text-center py-8">
+                        <p className="text-gray-400 mb-4">Start building your watchlist by adding stocks from the stocks page</p>
+                        <Link href="/stocks">
+                            <Button className="yellow-btn">
+                                Browse Stocks
+                            </Button>
+                        </Link>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {watchlist.slice(0, 5).map((symbol) => (
+                            <div
+                                key={symbol}
+                                className="flex items-center justify-between p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors"
+                            >
+                                <Link 
+                                    href={`/stocks/${symbol.toLowerCase()}`}
+                                    className="flex-1 hover:text-yellow-500 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-lg font-semibold text-gray-100">{symbol}</span>
+                                    </div>
+                                </Link>
+                                <WatchlistButton
+                                    symbol={symbol}
+                                    company={symbol}
+                                    isInWatchlist={true}
+                                    type="icon"
+                                    onWatchlistChange={handleWatchlistChange}
+                                />
+                            </div>
+                        ))}
+                        {watchlist.length > 5 && (
+                            <div className="text-center pt-2">
+                                <p className="text-sm text-gray-400">
+                                    and {watchlist.length - 5} more {watchlist.length - 5 === 1 ? 'stock' : 'stocks'}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

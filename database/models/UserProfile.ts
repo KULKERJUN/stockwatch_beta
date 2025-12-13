@@ -9,6 +9,8 @@ export interface IUserProfile {
     investmentGoals?: string;
     riskTolerance?: string;
     preferredIndustry?: string;
+    // Watchlist - array of stock symbols
+    watchlist?: string[];
     // Account settings
     settings?: {
         notifications?: {
@@ -62,6 +64,10 @@ const UserProfileSchema = new Schema<IUserProfile>(
         },
         preferredIndustry: {
             type: String,
+        },
+        watchlist: {
+            type: [String],
+            default: [],
         },
         settings: {
             type: {

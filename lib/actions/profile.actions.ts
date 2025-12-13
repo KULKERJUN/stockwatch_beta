@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/database/mongoose';
 import UserProfile from '@/database/models/UserProfile';
 import { auth } from '@/lib/better-auth/auth';
 import { headers } from 'next/headers';
+import { revalidatePath } from 'next/cache';
 
 export const getUserProfile = async () => {
     try {
@@ -53,34 +54,22 @@ export const updateUserProfile = async (data: {
         if (data.name !== undefined) updateData.name = data.name;
         if (data.email !== undefined) updateData.email = data.email;
 
-        // If email is being updated, also update it in better-auth
-        if (data.email && data.email !== session.user.email) {
-            try {
-                // Better-auth uses updateUser method
-                const updateResult = await auth.api.updateUser({
-                    headers: await headers(),
-                    body: {
-                        email: data.email,
-                    },
-                });
-                if (!updateResult) {
-                    throw new Error('Failed to update email');
-                }
-            } catch (error: any) {
-                console.error('Error updating email in auth:', error);
-                return { success: false, error: error?.message || 'Failed to update email. It may already be in use.' };
-            }
-        }
+        // Note: Email updates in better-auth may require email verification
+        // For now, we only update email in UserProfile model
+        // If email update in better-auth is needed, it should be handled separately with verification
 
         // If name is being updated, also update it in better-auth
         if (data.name && data.name !== session.user.name) {
             try {
-                await auth.api.updateUser({
+                const updateResult = await auth.api.updateUser({
                     headers: await headers(),
                     body: {
                         name: data.name,
-                    },
+                    } as any, // Type assertion needed due to better-auth type definitions
                 });
+                if (!updateResult) {
+                    console.warn('Name update in auth returned no result');
+                }
             } catch (error) {
                 console.error('Error updating name in auth:', error);
                 // Don't fail the whole update if name update fails
@@ -246,6 +235,157 @@ export const createUserProfile = async (data: {
     } catch (error) {
         console.error('Error creating user profile:', error);
         return { success: false, error: 'Failed to create user profile' };
+    }
+};
+
+export const addToWatchlist = async (symbol: string) => {
+    try {
+        const session = await auth.api.getSession({ headers: await headers() });
+
+        if (!session?.user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        await connectToDatabase();
+
+        const normalizedSymbol = symbol.toUpperCase();
+        
+        // Get or create profile
+        let profile = await UserProfile.findOne({ userId: session.user.id });
+
+        if (!profile) {
+            // Create profile if it doesn't exist
+            profile = await UserProfile.create({
+                userId: session.user.id,
+                name: session.user.name || '',
+                email: session.user.email || '',
+                watchlist: [normalizedSymbol],
+            });
+            const newProfile = await UserProfile.findById(profile._id).lean();
+            return { success: true, data: JSON.parse(JSON.stringify(newProfile)) };
+        }
+
+        const currentWatchlist = profile.watchlist || [];
+
+        // Check if already in watchlist
+        if (currentWatchlist.includes(normalizedSymbol)) {
+            return { success: true, data: JSON.parse(JSON.stringify(profile)) };
+        }
+
+        // Add to watchlist - create new array to ensure Mongoose detects the change
+        const updatedWatchlist = [...currentWatchlist, normalizedSymbol];
+        const updatedProfile = await UserProfile.findOneAndUpdate(
+            { userId: session.user.id },
+            { $set: { watchlist: updatedWatchlist } },
+            { new: true, runValidators: true }
+        ).lean();
+
+        if (!updatedProfile) {
+            return { success: false, error: 'Failed to update profile' };
+        }
+
+        // Revalidate relevant paths
+        revalidatePath('/profile');
+        revalidatePath('/watchlist');
+        revalidatePath(`/stocks/${normalizedSymbol.toLowerCase()}`);
+
+        return { success: true, data: JSON.parse(JSON.stringify(updatedProfile)) };
+    } catch (error) {
+        console.error('Error adding to watchlist:', error);
+        return { success: false, error: 'Failed to add to watchlist' };
+    }
+};
+
+export const removeFromWatchlist = async (symbol: string) => {
+    try {
+        const session = await auth.api.getSession({ headers: await headers() });
+
+        if (!session?.user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        await connectToDatabase();
+
+        const profile = await UserProfile.findOne({ userId: session.user.id });
+
+        if (!profile) {
+            return { success: false, error: 'Profile not found' };
+        }
+
+        const normalizedSymbol = symbol.toUpperCase();
+        const currentWatchlist = profile.watchlist || [];
+        const updatedWatchlist = currentWatchlist.filter((s: string) => s !== normalizedSymbol);
+
+        const updatedProfile = await UserProfile.findOneAndUpdate(
+            { userId: session.user.id },
+            { $set: { watchlist: updatedWatchlist } },
+            { new: true, runValidators: true }
+        ).lean();
+
+        if (!updatedProfile) {
+            return { success: false, error: 'Failed to update profile' };
+        }
+
+        // Revalidate relevant paths
+        revalidatePath('/profile');
+        revalidatePath('/watchlist');
+        revalidatePath(`/stocks/${normalizedSymbol.toLowerCase()}`);
+
+        return { success: true, data: JSON.parse(JSON.stringify(updatedProfile)) };
+    } catch (error) {
+        console.error('Error removing from watchlist:', error);
+        return { success: false, error: 'Failed to remove from watchlist' };
+    }
+};
+
+export const getWatchlist = async () => {
+    try {
+        const session = await auth.api.getSession({ headers: await headers() });
+
+        if (!session?.user) {
+            return { success: false, error: 'Not authenticated' };
+        }
+
+        await connectToDatabase();
+
+        const profile = await UserProfile.findOne({ userId: session.user.id }).lean();
+
+        if (!profile) {
+            return { success: true, data: [] };
+        }
+
+        const watchlist = profile.watchlist || [];
+        return { success: true, data: watchlist };
+    } catch (error) {
+        console.error('Error getting watchlist:', error);
+        return { success: false, error: 'Failed to get watchlist' };
+    }
+};
+
+export const isStockInWatchlist = async (symbol: string) => {
+    try {
+        const session = await auth.api.getSession({ headers: await headers() });
+
+        if (!session?.user) {
+            return { success: true, data: false };
+        }
+
+        await connectToDatabase();
+
+        const profile = await UserProfile.findOne({ userId: session.user.id }).lean();
+
+        if (!profile) {
+            return { success: true, data: false };
+        }
+
+        const normalizedSymbol = symbol.toUpperCase();
+        const watchlist = profile.watchlist || [];
+        const isInWatchlist = watchlist.includes(normalizedSymbol);
+
+        return { success: true, data: isInWatchlist };
+    } catch (error) {
+        console.error('Error checking watchlist:', error);
+        return { success: true, data: false };
     }
 };
 
