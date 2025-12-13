@@ -11,7 +11,7 @@ import {
 import {useRouter} from "next/navigation";
 import { Button } from "./ui/button";
 import {Avatar, AvatarFallback, AvatarImage} from "@/components/ui/avatar";
-import {LogOut} from "lucide-react";
+import {LogOut, User} from "lucide-react";
 import NavItems from "@/components/NavItems";
 import {signOut} from "@/lib/actions/auth.actions";
 
@@ -57,6 +57,14 @@ const UserDropdown = ({user}:{user: User}) => {
                         </div>
                     </div>
                 </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-gray-600"/>
+                <DropdownMenuItem 
+                    onClick={() => router.push('/profile')} 
+                    className="text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer"
+                >
+                    <User className="h-4 w-4 mr-2 hidden sm:block" />
+                    Profile
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-600"/>
                 <DropdownMenuItem onClick={handleSignOut} className="text-gray-100 text-md font-medium focus:bg-transparent focus:text-yellow-500 transition-colors cursor-pointer">
                     <LogOut className="h-4 w-4 mr-2 hidden sm:block" />
