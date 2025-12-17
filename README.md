@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+This is a [Next.js](https://nextjs.org) project.
 
-## Getting Started
+## Prerequisites (Windows)
 
-First, run the development server:
+- Node.js LTS (v18.18+ recommended, v20+ OK): https://nodejs.org/en/download
+- Git: https://git-scm.com/downloads
+- A package manager: npm (bundled with Node). You may also use yarn/pnpm/bun if preferred.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Verify after install in a new PowerShell:
+
+```powershell
+node -v
+npm -v
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Create a `.env.local` in the project root (same folder as `package.json`) using the example below:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Database (MongoDB Atlas or local MongoDB)
+MONGODB_URI="mongodb+srv://<user>:<password>@<cluster>/<db>?retryWrites=true&w=majority"
 
-## Learn More
+# Finnhub (news & market data)
+# Either FINNHUB_API_KEY (server) or NEXT_PUBLIC_FINNHUB_API_KEY (client) – one is required
+FINNHUB_API_KEY=""
+NEXT_PUBLIC_FINNHUB_API_KEY=""
 
-To learn more about Next.js, take a look at the following resources:
+# Email (Nodemailer SMTP)
+NODEMAILER_EMAIL=""
+NODEMAILER_PASSWORD=""
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# Better Auth
+BETTER_AUTH_SECRET=""
+BETTER_AUTH_URL="http://localhost:3000" # base URL of the app during dev
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+# Inngest AI (Gemini)
+GEMINI_API_KEY=""
+```
 
-## Deploy on Vercel
+You can also copy the provided `.env.example` to `.env.local` and fill values:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```powershell
+copy .env.example .env.local
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Install dependencies
+
+From the project root directory:
+
+```powershell
+# Prefer clean install when lockfile is present
+npm ci
+# If that fails (e.g., first setup), run:
+npm install
+```
+
+## Run the development server
+
+```powershell
+npm run dev
+```
+
+Open http://localhost:3000 in your browser.
+
+## Recommended VS Code extensions
+
+- ESLint (dbaeumer.vscode-eslint)
+- Tailwind CSS IntelliSense (bradlc.vscode-tailwindcss)
+
+## Notes
+
+- This project uses Next.js App Router and React 19.
+- Ensure your environment variables are set; missing keys (e.g., Finnhub or MongoDB) can cause runtime errors when visiting parts of the app that need them.
