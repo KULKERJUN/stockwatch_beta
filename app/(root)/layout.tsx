@@ -2,6 +2,7 @@ import {headers} from "next/headers";
 import {auth} from "@/lib/better-auth/auth";
 import {redirect} from "next/navigation";
 import Header from "@/components/Header";
+import PriceAlertManager from "@/components/PriceAlertManager";
 
 const Layout = async ({children}:{children: React.ReactNode}) => {
     const session = await auth.api.getSession({headers: await headers()});
@@ -17,6 +18,7 @@ const Layout = async ({children}:{children: React.ReactNode}) => {
     return (
         <main className="min-h-screen">
             <Header user = {user} />
+            <PriceAlertManager />
             <div className = "min-h-scren text-gray-400">
                 {children}
             </div>
