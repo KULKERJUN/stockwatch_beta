@@ -95,6 +95,36 @@ declare global {
         count: number;
         result: FinnhubSearchResult[];
     };
+
+    type UserForNewsEmail = {
+        id: string;
+        email: string;
+        name: string;
+    };
+
+    type RawNewsArticle = {
+        id?: number;
+        headline?: string;
+        summary?: string;
+        source?: string;
+        url?: string;
+        datetime?: number;
+        image?: string;
+        category?: string;
+        related?: string;
+    };
+
+    type MarketNewsArticle = {
+        id: number;
+        headline: string;
+        summary: string;
+        source: string;
+        url: string;
+        datetime: number;
+        image: string;
+        category: string;
+        related: string;
+    };
 }
 
 export {};
