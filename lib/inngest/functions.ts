@@ -78,6 +78,7 @@ export const checkPriceAlerts = inngest.createFunction(
                 (alert.condition === 'BELOW' && currentPrice <= alert.targetPrice);
 
             if (isTriggered) {
+                console.log(`Alert triggered for ${alert.symbol}: Current Price ${currentPrice}, Target ${alert.targetPrice} (${alert.condition})`);
                 await step.run(`trigger-alert-${alert._id}`, async () => {
                     await connectToDatabase();
                     
