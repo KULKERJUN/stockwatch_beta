@@ -18,16 +18,17 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
     if (!email) return [];
 
     try {
-        const mongoose = await ensureDb();
-        // Accessing the raw driver for Better Auth compatibility
-        const db = (mongoose as any).connection.db;
-        if (!db) throw new Error('MongoDB connection not found');
+        await ensureDb();
 
-        const user = await db.collection('user').findOne({ email });
-        if (!user) return [];
+        // Get the current session to find the user by email
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
 
-        const userId = user.id || String(user._id || '');
-        const items = await Watchlist.find({ userId }, { symbol: 1 }).lean();
+        if (!session?.user) return [];
+
+        // Find watchlist items for the authenticated user
+        const items = await Watchlist.find({ userId: session.user.id }, { symbol: 1 }).lean();
 
         return items.map((i) => String(i.symbol));
     } catch (err) {
@@ -102,4 +103,74 @@ export const removeFromWatchlist = async (symbol: string) => {
     }
 
     if (shouldRedirect) redirect('/sign-in');
+};
+
+// Get user's watchlist
+export const getUserWatchlist = async () => {
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
+        if (!session?.user) redirect('/sign-in');
+
+        const watchlist = await Watchlist.find({ userId: session.user.id })
+            .sort({ addedAt: -1 })
+            .lean();
+
+        return JSON.parse(JSON.stringify(watchlist));
+    } catch (error) {
+        console.error('Error fetching watchlist:', error);
+        throw new Error('Failed to fetch watchlist');
+    }
+};
+
+// Get user's watchlist with detailed stock data
+export const getWatchlistWithData = async () => {
+    try {
+        const session = await auth.api.getSession({
+            headers: await headers(),
+        });
+        if (!session?.user) redirect('/sign-in');
+
+        const watchlist = await Watchlist.find({ userId: session.user.id })
+            .sort({ addedAt: -1 })
+            .lean();
+
+        if (watchlist.length === 0) return [];
+
+        // Import getStocksDetails dynamically to avoid circular dependency
+        const { getStocksDetails } = await import('./finnhub.actions');
+
+        const stocksWithData = await Promise.all(
+            watchlist.map(async (item) => {
+                try {
+                    const stockData = await getStocksDetails(item.symbol);
+
+                    if (!stockData) {
+                        console.warn(`Failed to fetch data for ${item.symbol}`);
+                        return item;
+                    }
+
+                    return {
+                        company: stockData.company,
+                        symbol: stockData.symbol,
+                        currentPrice: stockData.currentPrice,
+                        priceFormatted: stockData.priceFormatted,
+                        changeFormatted: stockData.changeFormatted,
+                        changePercent: stockData.changePercent,
+                        marketCap: stockData.marketCapFormatted,
+                        peRatio: stockData.peRatio,
+                    };
+                } catch (error) {
+                    console.error(`Error fetching data for ${item.symbol}:`, error);
+                    return item;
+                }
+            })
+        );
+
+        return JSON.parse(JSON.stringify(stocksWithData));
+    } catch (error) {
+        console.error('Error loading watchlist:', error);
+        throw new Error('Failed to fetch watchlist');
+    }
 };
