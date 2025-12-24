@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/database/mongoose';
 import { Stock } from '@/lib/models/Stock';
+import { getStockPrice } from '@/lib/actions/stock.actions';
 
 // GET - Fetch all stocks OR single stock by query parameter
 export async function GET(request: NextRequest) {
@@ -12,20 +13,51 @@ export async function GET(request: NextRequest) {
         const sector = searchParams.get('sector');
 
         if (symbol) {
+            const upper = symbol.toUpperCase();
+
+            // Try to enrich with any stored metadata, but price comes from TradingView
             const stock = await Stock.findOne({
-                symbol: symbol.toUpperCase()
+                symbol: upper
             });
 
-            if (!stock) {
+            let currentPrice = 0;
+            let changePercent: number | null = null;
+            let high: number | null = null;
+            let low: number | null = null;
+            let volume: number | null = null;
+            let marketStatus: 'OPEN' | 'CLOSED' | 'UNKNOWN' = 'UNKNOWN';
+            let lastUpdate: string | null = null;
+
+            try {
+                // For now, use getStockPrice which returns latest price only.
+                // If extended OHLC data is later added, this block is where we map it.
+                currentPrice = await getStockPrice(upper);
+                lastUpdate = new Date().toISOString();
+            } catch (e) {
+                console.error('Error enriching stock with real-time price:', e);
+            }
+
+            if (!stock && !currentPrice) {
                 return NextResponse.json({
                     success: false,
-                    error: `Stock with symbol '${symbol.toUpperCase()}' not found`
+                    error: `Stock with symbol '${upper}' not found`
                 }, { status: 404 });
             }
 
             return NextResponse.json({
                 success: true,
-                data: stock
+                data: {
+                    symbol: upper,
+                    companyName: stock?.companyName ?? upper,
+                    sector: stock?.sector,
+                    currentPrice,
+                    changePercent,
+                    high,
+                    low,
+                    volume,
+                    marketStatus,
+                    lastUpdate,
+                }
             }, { status: 200 });
         }
 
