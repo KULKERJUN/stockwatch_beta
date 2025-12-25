@@ -231,3 +231,166 @@ export const getStocksDetails = cache(async (symbol: string) => {
     }
 });
 
+// =====================
+// CRYPTO API FUNCTIONS
+// =====================
+
+/**
+ * Fetch available crypto symbols from a specific exchange
+ * @param exchange - Exchange name (e.g., 'binance', 'coinbase', 'kraken')
+ * @returns Array of crypto symbols
+ */
+export const getCryptoSymbols = cache(async (exchange: string = 'binance'): Promise<CryptoSymbol[]> => {
+    try {
+        const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+        if (!token) {
+            console.error('FINNHUB API key is not configured');
+            return [];
+        }
+
+        const url = `${FINNHUB_BASE_URL}/crypto/symbol?exchange=${encodeURIComponent(exchange)}&token=${token}`;
+        const data = await fetchJSON<CryptoSymbol[]>(url, 3600); // Cache for 1 hour
+
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.error('Error fetching crypto symbols:', error);
+        return [];
+    }
+});
+
+/**
+ * Fetch crypto candle/price data for a symbol
+ * @param symbol - Crypto symbol (e.g., 'BINANCE:BTCUSDT')
+ * @param resolution - Time resolution (1, 5, 15, 30, 60, D, W, M)
+ * @param from - Unix timestamp for start
+ * @param to - Unix timestamp for end
+ */
+export const getCryptoCandles = cache(async (
+    symbol: string,
+    resolution: string = 'D',
+    from?: number,
+    to?: number
+): Promise<CryptoCandleData | null> => {
+    try {
+        const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+        if (!token) {
+            console.error('FINNHUB API key is not configured');
+            return null;
+        }
+
+        // Default to last 30 days if no range provided
+        const now = Math.floor(Date.now() / 1000);
+        const fromTime = from ?? now - 30 * 24 * 60 * 60;
+        const toTime = to ?? now;
+
+        const url = `${FINNHUB_BASE_URL}/crypto/candle?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}&from=${fromTime}&to=${toTime}&token=${token}`;
+        const data = await fetchJSON<CryptoCandleData>(url, 300); // Cache for 5 minutes
+
+        if (!data || data.s === 'no_data') {
+            return null;
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error fetching crypto candles:', error);
+        return null;
+    }
+});
+
+/**
+ * Fetch general crypto news
+ * @returns Array of crypto news articles
+ */
+export const getCryptoNews = cache(async (): Promise<MarketNewsArticle[]> => {
+    try {
+        const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+        if (!token) {
+            console.error('FINNHUB API key is not configured');
+            return [];
+        }
+
+        const url = `${FINNHUB_BASE_URL}/news?category=crypto&token=${token}`;
+        const data = await fetchJSON<RawNewsArticle[]>(url, 300); // Cache for 5 minutes
+
+        if (!Array.isArray(data)) return [];
+
+        const seen = new Set<string>();
+        const unique: RawNewsArticle[] = [];
+
+        for (const art of data) {
+            if (!validateArticle(art)) continue;
+            const key = `${art.id}-${art.url}-${art.headline}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            unique.push(art);
+            if (unique.length >= 20) break;
+        }
+
+        return unique.slice(0, 10).map((a, idx) => formatArticle(a, false, undefined, idx));
+    } catch (error) {
+        console.error('Error fetching crypto news:', error);
+        return [];
+    }
+});
+
+/**
+ * Get popular crypto pairs with their current prices
+ * @param exchange - Exchange name (default: 'binance')
+ * @param limit - Number of cryptos to fetch (default: 20)
+ * @returns Array of popular crypto data
+ */
+export const getPopularCryptos = cache(async (exchange: string = 'binance', limit: number = 20): Promise<CryptoWithPrice[]> => {
+    // Top 20 crypto pairs by market cap
+    const allPairs = [
+        'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT',
+        'DOGEUSDT', 'SOLUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT',
+        'AVAXUSDT', 'LINKUSDT', 'ATOMUSDT', 'UNIUSDT', 'XLMUSDT',
+        'ETCUSDT', 'FILUSDT', 'TRXUSDT', 'NEARUSDT', 'APTUSDT'
+    ];
+
+    const popularPairs = allPairs.slice(0, limit);
+
+    try {
+        const token = process.env.FINNHUB_API_KEY ?? NEXT_PUBLIC_FINNHUB_API_KEY;
+        if (!token) {
+            console.error('FINNHUB API key is not configured');
+            return [];
+        }
+
+        const cryptoData = await Promise.all(
+            popularPairs.map(async (pair) => {
+                const symbol = `${exchange.toUpperCase()}:${pair}`;
+                try {
+                    const url = `${FINNHUB_BASE_URL}/quote?symbol=${encodeURIComponent(symbol)}&token=${token}`;
+                    const quote = await fetchJSON<QuoteData>(url, 60); // Cache for 1 minute
+
+                    if (!quote?.c) return null;
+
+                    // Extract base currency from pair (e.g., BTC from BTCUSDT)
+                    const baseCurrency = pair.replace('USDT', '');
+
+                    return {
+                        symbol,
+                        displaySymbol: pair,
+                        description: `${baseCurrency}/USDT`,
+                        currentPrice: quote.c,
+                        change: quote.d || 0,
+                        changePercent: quote.dp || 0,
+                        high: quote.h || 0,
+                        low: quote.l || 0,
+                        priceFormatted: formatPrice(quote.c),
+                        changeFormatted: formatChangePercent(quote.dp || 0),
+                    };
+                } catch {
+                    return null;
+                }
+            })
+        );
+
+        return cryptoData.filter((c): c is CryptoWithPrice => c !== null);
+    } catch (error) {
+        console.error('Error fetching popular cryptos:', error);
+        return [];
+    }
+});
+

@@ -15,6 +15,7 @@ interface WatchlistButtonProps {
     isInWatchlist: boolean;
     showTrashIcon?: boolean;
     type?: 'button' | 'icon';
+    assetType?: 'stock' | 'crypto';
     onWatchlistChange?: (symbol: string, isAdded: boolean) => void;
 }
 
@@ -24,6 +25,7 @@ const WatchlistButton = ({
     isInWatchlist,
     showTrashIcon = false,
     type = 'button',
+    assetType = 'stock',
     onWatchlistChange,
 }: WatchlistButtonProps) => {
     const [added, setAdded] = useState<boolean>(isInWatchlist);
@@ -37,7 +39,7 @@ const WatchlistButton = ({
     const toggleWatchlist = async () => {
         const result = added
             ? await removeFromWatchlist(symbol)
-            : await addToWatchlist(symbol, company);
+            : await addToWatchlist(symbol, company, assetType);
 
         if (result && result.success) {
             toast.success(added ? 'Removed from Watchlist' : 'Added to Watchlist', {

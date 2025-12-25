@@ -37,7 +37,7 @@ export async function getWatchlistSymbolsByEmail(email: string): Promise<string[
     }
 }
 
-export const addToWatchlist = async (symbol: string, company: string) => {
+export const addToWatchlist = async (symbol: string, company: string, assetType: 'stock' | 'crypto' = 'stock') => {
     let shouldRedirect = false;
 
     try {
@@ -57,21 +57,22 @@ export const addToWatchlist = async (symbol: string, company: string) => {
             });
 
             if (existingItem) {
-                return { success: false, error: 'Stock already in watchlist' };
+                return { success: false, error: `${assetType === 'crypto' ? 'Crypto' : 'Stock'} already in watchlist` };
             }
 
             await Watchlist.create({
                 userId: session.user.id,
                 symbol: normalizedSymbol,
                 company: company.trim(),
+                assetType,
             });
 
             revalidatePath('/watchlist');
-            return { success: true, message: 'Stock added to watchlist' };
+            return { success: true, message: `${assetType === 'crypto' ? 'Crypto' : 'Stock'} added to watchlist` };
         }
     } catch (error) {
         console.error('Error adding to watchlist:', error);
-        return { success: false, error: 'Failed to add stock' };
+        return { success: false, error: `Failed to add ${assetType}` };
     }
 
     if (shouldRedirect) redirect('/sign-in');
@@ -138,17 +139,57 @@ export const getWatchlistWithData = async () => {
 
         if (watchlist.length === 0) return [];
 
-        // Import getStocksDetails dynamically to avoid circular dependency
-        const { getStocksDetails } = await import('./finnhub.actions');
+        // Import functions dynamically to avoid circular dependency
+        const { getStocksDetails, getPopularCryptos } = await import('./finnhub.actions');
 
         const stocksWithData = await Promise.all(
             watchlist.map(async (item) => {
                 try {
+                    const isCrypto = item.assetType === 'crypto';
+
+                    if (isCrypto) {
+                        // For crypto, we need to fetch price data differently
+                        // Extract the pair from the symbol (e.g., BINANCE:BTCUSDT -> BTCUSDT)
+                        const pairMatch = item.symbol.match(/:(.+)/);
+                        const pair = pairMatch ? pairMatch[1] : item.symbol;
+                        const baseCurrency = pair.replace('USDT', '');
+
+                        // Fetch popular cryptos which includes price data
+                        const cryptos = await getPopularCryptos('binance');
+                        const cryptoData = cryptos.find(
+                            (c) => c.displaySymbol === pair || c.symbol === item.symbol
+                        );
+
+                        if (cryptoData) {
+                            return {
+                                company: item.company || `${baseCurrency}/USDT`,
+                                symbol: item.symbol,
+                                currentPrice: cryptoData.currentPrice,
+                                priceFormatted: cryptoData.priceFormatted,
+                                changeFormatted: cryptoData.changeFormatted,
+                                changePercent: cryptoData.changePercent,
+                                marketCap: '—',
+                                peRatio: '—',
+                                assetType: 'crypto' as const,
+                            };
+                        }
+
+                        // Fallback if crypto not in popular list
+                        return {
+                            company: item.company || `${baseCurrency}/USDT`,
+                            symbol: item.symbol,
+                            marketCap: '—',
+                            peRatio: '—',
+                            assetType: 'crypto' as const,
+                        };
+                    }
+
+                    // For stocks, use existing logic
                     const stockData = await getStocksDetails(item.symbol);
 
                     if (!stockData) {
                         console.warn(`Failed to fetch data for ${item.symbol}`);
-                        return item;
+                        return { ...item, assetType: 'stock' as const };
                     }
 
                     return {
@@ -160,10 +201,11 @@ export const getWatchlistWithData = async () => {
                         changePercent: stockData.changePercent,
                         marketCap: stockData.marketCapFormatted,
                         peRatio: stockData.peRatio,
+                        assetType: 'stock' as const,
                     };
                 } catch (error) {
                     console.error(`Error fetching data for ${item.symbol}:`, error);
-                    return item;
+                    return { ...item, assetType: item.assetType || 'stock' };
                 }
             })
         );

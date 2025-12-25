@@ -1,7 +1,8 @@
 export const NAV_ITEMS = [
-    { href: '/', label: 'Dashboard' },
-    { href: '/search', label: 'Search' },
+    { href: '/', label: 'Stocks' },
+    { href: '/crypto', label: 'Crypto' },
     { href: '/watchlist', label: 'Watchlist' },
+    { href: '/search', label: 'Search' },
 ];
 
 // Sign-up form select options
@@ -337,3 +338,147 @@ export const WATCHLIST_TABLE_HEADER = [
     'Alert',
     'Action',
 ];
+
+// =====================
+// CRYPTO CONSTANTS
+// =====================
+
+// Top 20 popular crypto pairs for the dashboard
+export const TOP_CRYPTO_PAIRS = [
+    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT',
+    'DOGEUSDT', 'SOLUSDT', 'DOTUSDT', 'MATICUSDT', 'LTCUSDT',
+    'AVAXUSDT', 'LINKUSDT', 'ATOMUSDT', 'UNIUSDT', 'XLMUSDT',
+    'ETCUSDT', 'FILUSDT', 'TRXUSDT', 'NEARUSDT', 'APTUSDT'
+];
+
+// Crypto Market Overview Widget (BTC & ETH charts)
+export const CRYPTO_MARKET_OVERVIEW_WIDGET_CONFIG = {
+    colorTheme: 'dark',
+    dateRange: '12M',
+    locale: 'en',
+    largeChartUrl: '',
+    isTransparent: true,
+    showFloatingTooltip: true,
+    plotLineColorGrowing: '#F7931A', // Bitcoin orange
+    plotLineColorFalling: '#F7931A',
+    gridLineColor: 'rgba(240, 243, 250, 0)',
+    scaleFontColor: '#DBDBDB',
+    belowLineFillColorGrowing: 'rgba(247, 147, 26, 0.12)',
+    belowLineFillColorFalling: 'rgba(247, 147, 26, 0.12)',
+    belowLineFillColorGrowingBottom: 'rgba(247, 147, 26, 0)',
+    belowLineFillColorFallingBottom: 'rgba(247, 147, 26, 0)',
+    symbolActiveColor: 'rgba(247, 147, 26, 0.05)',
+    tabs: [
+        {
+            title: 'Major',
+            symbols: [
+                { s: 'BINANCE:BTCUSDT', d: 'Bitcoin' },
+                { s: 'BINANCE:ETHUSDT', d: 'Ethereum' },
+                { s: 'BINANCE:BNBUSDT', d: 'BNB' },
+                { s: 'BINANCE:SOLUSDT', d: 'Solana' },
+            ],
+        },
+        {
+            title: 'DeFi',
+            symbols: [
+                { s: 'BINANCE:UNIUSDT', d: 'Uniswap' },
+                { s: 'BINANCE:LINKUSDT', d: 'Chainlink' },
+                { s: 'BINANCE:AVAXUSDT', d: 'Avalanche' },
+                { s: 'BINANCE:ATOMUSDT', d: 'Cosmos' },
+            ],
+        },
+        {
+            title: 'Alt Coins',
+            symbols: [
+                { s: 'BINANCE:ADAUSDT', d: 'Cardano' },
+                { s: 'BINANCE:XRPUSDT', d: 'XRP' },
+                { s: 'BINANCE:DOGEUSDT', d: 'Dogecoin' },
+                { s: 'BINANCE:DOTUSDT', d: 'Polkadot' },
+            ],
+        },
+    ],
+    support_host: 'https://www.tradingview.com',
+    backgroundColor: '#141414',
+    width: '100%',
+    height: 600,
+    showSymbolLogo: true,
+    showChart: true,
+};
+
+// Crypto Heatmap Widget
+export const CRYPTO_HEATMAP_WIDGET_CONFIG = {
+    dataSource: 'Crypto',
+    blockSize: 'market_cap_calc',
+    blockColor: 'change',
+    grouping: 'no_group',
+    isTransparent: true,
+    locale: 'en',
+    symbolUrl: '',
+    colorTheme: 'dark',
+    hasTopBar: false,
+    isDataSetEnabled: false,
+    isZoomEnabled: true,
+    hasSymbolTooltip: true,
+    isMonoSize: false,
+    width: '100%',
+    height: '600',
+};
+
+// Crypto News Timeline Widget
+export const CRYPTO_NEWS_WIDGET_CONFIG = {
+    displayMode: 'regular',
+    feedMode: 'market',
+    colorTheme: 'dark',
+    isTransparent: true,
+    locale: 'en',
+    market: 'crypto',
+    width: '100%',
+    height: '600',
+};
+
+// Crypto Market Data/Quotes Widget
+export const CRYPTO_MARKET_DATA_WIDGET_CONFIG = {
+    title: 'Cryptocurrencies',
+    width: '100%',
+    height: 600,
+    locale: 'en',
+    showSymbolLogo: true,
+    colorTheme: 'dark',
+    isTransparent: false,
+    backgroundColor: '#0F0F0F',
+    symbolsGroups: [
+        {
+            name: 'Major Coins',
+            symbols: [
+                { name: 'BINANCE:BTCUSDT', displayName: 'Bitcoin' },
+                { name: 'BINANCE:ETHUSDT', displayName: 'Ethereum' },
+                { name: 'BINANCE:BNBUSDT', displayName: 'BNB' },
+                { name: 'BINANCE:SOLUSDT', displayName: 'Solana' },
+                { name: 'BINANCE:XRPUSDT', displayName: 'XRP' },
+                { name: 'BINANCE:ADAUSDT', displayName: 'Cardano' },
+            ],
+        },
+        {
+            name: 'DeFi & Layer 2',
+            symbols: [
+                { name: 'BINANCE:AVAXUSDT', displayName: 'Avalanche' },
+                { name: 'BINANCE:LINKUSDT', displayName: 'Chainlink' },
+                { name: 'BINANCE:MATICUSDT', displayName: 'Polygon' },
+                { name: 'BINANCE:UNIUSDT', displayName: 'Uniswap' },
+                { name: 'BINANCE:ATOMUSDT', displayName: 'Cosmos' },
+                { name: 'BINANCE:DOTUSDT', displayName: 'Polkadot' },
+            ],
+        },
+        {
+            name: 'Meme & Others',
+            symbols: [
+                { name: 'BINANCE:DOGEUSDT', displayName: 'Dogecoin' },
+                { name: 'BINANCE:LTCUSDT', displayName: 'Litecoin' },
+                { name: 'BINANCE:ETCUSDT', displayName: 'Ethereum Classic' },
+                { name: 'BINANCE:TRXUSDT', displayName: 'Tron' },
+                { name: 'BINANCE:NEARUSDT', displayName: 'NEAR Protocol' },
+                { name: 'BINANCE:APTUSDT', displayName: 'Aptos' },
+            ],
+        },
+    ],
+};
