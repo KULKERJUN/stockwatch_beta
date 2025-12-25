@@ -61,6 +61,23 @@ declare global {
         initialStocks: StockWithWatchlistStatus[];
     };
 
+    type WatchlistTableItem = {
+        company: string;
+        symbol: string;
+        currentPrice?: number;
+        priceFormatted?: string;
+        changeFormatted?: string;
+        changePercent?: number;
+        marketCap?: string;
+        peRatio?: string;
+        assetType?: 'stock' | 'crypto';
+    };
+
+    type WatchlistTableProps = {
+        items: WatchlistTableItem[];
+        onRemoveAction?: () => void;
+    };
+
     type WelcomeEmailData = {
         email: string;
         name: string;
@@ -96,34 +113,133 @@ declare global {
         result: FinnhubSearchResult[];
     };
 
+    type MarketNewsArticle = {
+        id?: string | number;
+        category?: string;
+        datetime?: number;
+        headline?: string;
+        image?: string;
+        related?: string;
+        source?: string;
+        summary?: string;
+        url?: string;
+    };
+
+    type RawNewsArticle = {
+        id?: string | number;
+        category?: string;
+        datetime?: number;
+        headline?: string;
+        image?: string;
+        related?: string;
+        source?: string;
+        summary?: string;
+        url?: string;
+    };
+
+    type QuoteData = {
+        c?: number; // Current price
+        d?: number; // Change
+        dp?: number; // Change percentage
+        h?: number; // High price of the day
+        l?: number; // Low price of the day
+        o?: number; // Open price of the day
+        pc?: number; // Previous close price
+        t?: number; // Unix timestamp
+    };
+
+    type ProfileData = {
+        country?: string;
+        currency?: string;
+        estimateRevenue?: number;
+        exchange?: string;
+        finnhubIndustry?: string;
+        ipo?: string;
+        logo?: string;
+        marketCapitalization?: number;
+        name?: string;
+        phone?: string;
+        shareOutstanding?: number;
+        ticker?: string;
+        weburl?: string;
+    };
+
+    type FinancialsData = {
+        metric?: {
+            peNormalizedAnnual?: number;
+            [key: string]: any;
+        };
+    };
+
+    type StockDetailsPageProps = {
+        params: Promise<{
+            symbol: string;
+        }>;
+    };
+
+    // Crypto Types
+    type CryptoSymbol = {
+        symbol: string;
+        displaySymbol: string;
+        description: string;
+    };
+
+    type CryptoCandleData = {
+        c: number[]; // Close prices
+        h: number[]; // High prices
+        l: number[]; // Low prices
+        o: number[]; // Open prices
+        s: string; // Status
+        t: number[]; // Timestamps
+        v: number[]; // Volumes
+    };
+
+    type CryptoWithPrice = {
+        symbol: string;
+        displaySymbol: string;
+        description: string;
+        currentPrice: number;
+        change: number;
+        changePercent: number;
+        high: number;
+        low: number;
+        priceFormatted: string;
+        changeFormatted: string;
+    };
+
+    type AssetType = 'stock' | 'crypto';
+
+    type WatchlistItemWithType = {
+        userId: string;
+        symbol: string;
+        company: string;
+        assetType: AssetType;
+        addedAt: Date;
+    };
+
+    // AI Sentiment Types
+    type SentimentResult = {
+        summary: string;
+        sentiment: 'bullish' | 'bearish' | 'mixed' | 'neutral';
+    };
+
+    type NewsItemForAI = {
+        headline: string;
+        summary?: string;
+    };
+
+    // User types for email functions
     type UserForNewsEmail = {
         id: string;
         email: string;
         name: string;
     };
 
-    type RawNewsArticle = {
-        id?: number;
-        headline?: string;
-        summary?: string;
-        source?: string;
-        url?: string;
-        datetime?: number;
-        image?: string;
-        category?: string;
-        related?: string;
-    };
-
-    type MarketNewsArticle = {
-        id: number;
-        headline: string;
-        summary: string;
-        source: string;
-        url: string;
-        datetime: number;
-        image: string;
-        category: string;
-        related: string;
+    // Alert type for price alerts
+    type Alert = {
+        alertType: 'upper' | 'lower';
+        threshold: number;
+        symbol?: string;
     };
 }
 

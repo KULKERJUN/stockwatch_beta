@@ -4,6 +4,7 @@ export interface WatchlistItem extends Document {
     userId: string;
     symbol: string;
     company: string;
+    assetType: 'stock' | 'crypto';
     addedAt: Date;
 }
 
@@ -12,6 +13,7 @@ const WatchlistSchema = new Schema<WatchlistItem>(
         userId: { type: String, required: true, index: true },
         symbol: { type: String, required: true, uppercase: true, trim: true },
         company: { type: String, required: true, trim: true },
+        assetType: { type: String, enum: ['stock', 'crypto'], default: 'stock' },
         addedAt: { type: Date, default: Date.now },
     },
     { timestamps: false }
