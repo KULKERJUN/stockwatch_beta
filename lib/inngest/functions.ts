@@ -9,6 +9,8 @@ import { connectToDatabase } from "@/database/mongoose";
 import PriceAlert from "@/database/models/PriceAlert";
 import UserProfile from "@/database/models/UserProfile";
 import { getMultipleStockPrices } from "@/lib/actions/stock.actions";
+import { generateText } from 'ai';
+import { openai } from '@ai-sdk/openai';
 
 export const sendSignUpEmail = inngest.createFunction(
     { id: 'sign-up-email' },
@@ -23,24 +25,20 @@ export const sendSignUpEmail = inngest.createFunction(
 
         const prompt = PERSONALIZED_WELCOME_EMAIL_PROMPT.replace('{{userProfile}}', userProfile)
 
-        const response = await step.ai.infer('generate-welcome-intro', {
-            model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
-            body: {
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [
-                            { text: prompt }
-                        ]
-                    }]
+        const introText = await step.run('generate-welcome-intro', async () => {
+            try {
+                const { text } = await generateText({
+                    model: openai('gpt-4o-mini'),
+                    prompt: prompt,
+                });
+                return text;
+            } catch (error) {
+                console.error('Error generating welcome intro:', error);
+                return 'Thanks for joining StockWatch. You now have the tools to track markets and make smarter moves.';
             }
-        })
+        });
 
         await step.run('send-welcome-email', async () => {
-            const part = response.candidates?.[0]?.content?.parts?.[0];
-            const introText = (part && 'text' in part ? part.text : null) ||'Thanks for joining StockWatch. You now have the tools to track markets and make smarter moves.'
-
-            //email send logic function
 
             const {data : {email, name}} = event;
             return await sendWelcomeEmail({email, name, intro: introText});
@@ -86,28 +84,27 @@ export const sendDailyNewsSummary = inngest.createFunction(
             return perUser;
         });
 
-        // Step #3: (placeholder) Summarize news via AI
+        // Step #3: Summarize news via AI using OpenAI
         const userNewsSummaries: { user: UserForNewsEmail; newsContent: string | null }[] = [];
 
         for (const { user, articles } of results) {
-            try {
-                const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace('{{newsData}}', JSON.stringify(articles, null, 2));
+            const newsContent = await step.run(`summarize-news-${user.email}`, async () => {
+                try {
+                    const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace('{{newsData}}', JSON.stringify(articles, null, 2));
 
-                const response = await step.ai.infer(`summarize-news-${user.email}`, {
-                    model: step.ai.models.gemini({ model: 'gemini-2.5-flash-lite' }),
-                    body: {
-                        contents: [{ role: 'user', parts: [{ text:prompt }]}]
-                    }
-                });
+                    const { text } = await generateText({
+                        model: openai('gpt-4o-mini'),
+                        prompt: prompt,
+                    });
 
-                const part = response.candidates?.[0]?.content?.parts?.[0];
-                const newsContent = (part && 'text' in part ? part.text : null) || 'No market news.'
+                    return text || 'No market news.';
+                } catch (error) {
+                    console.error('Failed to summarize news for:', user.email, error);
+                    return null;
+                }
+            });
 
-                userNewsSummaries.push({ user, newsContent });
-            } catch (e) {
-                console.error('Failed to summarize news for : ', user.email);
-                userNewsSummaries.push({ user, newsContent: null });
-            }
+            userNewsSummaries.push({ user, newsContent });
         }
 
         // Step #4: (placeholder) Send the emails

@@ -2,6 +2,7 @@ export const NAV_ITEMS = [
     { href: '/', label: 'Stocks' },
     { href: '/crypto', label: 'Crypto' },
     { href: '/watchlist', label: 'Watchlist' },
+    { href: '/trade', label: 'Trade' },
     { href: '/compare', label: 'Compare' },
     { href: '/alerts', label: 'Price Alerts' },
     { href: '/search', label: 'Search' },

@@ -34,8 +34,8 @@ NODEMAILER_PASSWORD=""
 BETTER_AUTH_SECRET=""
 BETTER_AUTH_URL="http://localhost:3000" # base URL of the app during dev
 
-# Inngest AI (Gemini)
-GEMINI_API_KEY=""
+# OpenAI (for AI features: welcome emails, news summaries, watchlist analysis)
+OPENAI_API_KEY=""
 ```
 
 You can also copy the provided `.env.example` to `.env.local` and fill values:

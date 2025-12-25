@@ -5,6 +5,7 @@ export interface IUser extends Document {
     email: string;
     password?: string;
     emailVerified: boolean;
+    virtualBalance?: mongoose.Types.Decimal128;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -14,6 +15,7 @@ const UserSchema = new Schema<IUser>({
     email: { type: String, required: true, unique: true },
     password: { type: String },
     emailVerified: { type: Boolean, default: false },
+    virtualBalance: { type: Schema.Types.Decimal128, default: 100000 },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
