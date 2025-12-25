@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import InputField from '@/components/forms/InputField';
 import SelectField from '@/components/forms/SelectField';
-import { getUserProfile, updateUserProfile, changePassword, updateAccountSettings, getWatchlist } from '@/lib/actions/profile.actions';
+import { getUserProfile, updateUserProfile, changePassword, updateAccountSettings } from '@/lib/actions/profile.actions';
+import { getUserWatchlist } from '@/lib/actions/watchlist.actions';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2 } from 'lucide-react';
@@ -141,14 +142,12 @@ const ProfilePage = () => {
 
         const loadWatchlist = async () => {
             try {
-                const result = await getWatchlist();
-                if (result.success && result.data) {
-                    setWatchlist(result.data);
-                } else {
-                    console.error('Failed to load watchlist:', result.error);
-                }
+                const watchlistItems = await getUserWatchlist();
+                const symbols = watchlistItems.map((item: { symbol: string }) => item.symbol);
+                setWatchlist(symbols);
             } catch (error) {
                 console.error('Error loading watchlist:', error);
+                setWatchlist([]);
             }
         };
 
@@ -258,14 +257,12 @@ const ProfilePage = () => {
 
     const refreshWatchlist = async () => {
         try {
-            const result = await getWatchlist();
-            if (result.success && result.data) {
-                setWatchlist(result.data);
-            } else {
-                console.error('Failed to refresh watchlist:', result.error);
-            }
+            const watchlistItems = await getUserWatchlist();
+            const symbols = watchlistItems.map((item: { symbol: string }) => item.symbol);
+            setWatchlist(symbols);
         } catch (error) {
             console.error('Error refreshing watchlist:', error);
+            setWatchlist([]);
         }
     };
 

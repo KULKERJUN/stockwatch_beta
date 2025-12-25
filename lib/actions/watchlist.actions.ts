@@ -189,7 +189,17 @@ export const getWatchlistWithData = async () => {
 
                     if (!stockData) {
                         console.warn(`Failed to fetch data for ${item.symbol}`);
-                        return { ...item, assetType: 'stock' as const };
+                        // Return item with basic info even if data fetch fails
+                        return {
+                            company: item.company || item.symbol,
+                            symbol: item.symbol,
+                            priceFormatted: '—',
+                            changeFormatted: '—',
+                            changePercent: 0,
+                            marketCap: '—',
+                            peRatio: '—',
+                            assetType: 'stock' as const,
+                        };
                     }
 
                     return {
@@ -205,7 +215,17 @@ export const getWatchlistWithData = async () => {
                     };
                 } catch (error) {
                     console.error(`Error fetching data for ${item.symbol}:`, error);
-                    return { ...item, assetType: item.assetType || 'stock' };
+                    // Return item with basic info even on error
+                    return {
+                        company: item.company || item.symbol,
+                        symbol: item.symbol,
+                        priceFormatted: '—',
+                        changeFormatted: '—',
+                        changePercent: 0,
+                        marketCap: '—',
+                        peRatio: '—',
+                        assetType: (item.assetType || 'stock') as 'stock' | 'crypto',
+                    };
                 }
             })
         );
