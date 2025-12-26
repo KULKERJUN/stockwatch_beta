@@ -7,6 +7,8 @@ import { auth } from '@/lib/better-auth/auth';
 import WatchlistTable from '@/components/WatchlistTable';
 import { headers } from 'next/headers';
 
+export const dynamic = 'force-dynamic';
+
 const getSentimentColor = (sentiment: string) => {
     switch (sentiment) {
         case 'bullish':
