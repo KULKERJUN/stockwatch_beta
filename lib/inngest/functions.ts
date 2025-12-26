@@ -186,7 +186,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
 
 export const checkPriceAlerts = inngest.createFunction(
     { id: 'check-price-alerts' },
-    { cron: '*/5 * * * *' }, // Run every 5 minutes
+    { cron: '0 */12 * * *' }, // Run every 12 hours
     async ({ step }) => {
         const alertsToProcess = await step.run('fetch-active-alerts', async () => {
             await connectToDatabase();
