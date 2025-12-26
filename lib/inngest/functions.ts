@@ -223,20 +223,74 @@ export const checkPriceAlerts = inngest.createFunction(
                         triggeredAt: new Date(),
                     });
 
-                    // Get user email
-                    const profile = await UserProfile.findOne({ userId: alert.userId }).lean();
-                    if (profile?.email) {
-                        await sendPriceAlertEmail({
-                            email: profile.email,
-                            symbol: alert.symbol,
-                            company: alert.symbol,
-                            currentPrice,
-                            targetPrice: alert.targetPrice,
-                            condition: alert.condition,
-                        });
+                    // Create notification through the notifications system
+                    // This respects user preferences (email/in-app/quiet hours)
+                    const isUpper = alert.condition === 'ABOVE';
+                    const title = `Price Alert: ${alert.symbol} ${isUpper ? 'Above' : 'Below'} Target`;
+                    
+                    // Store alert metadata as JSON in a data attribute for easy parsing
+                    const alertMetadata = JSON.stringify({
+                        symbol: alert.symbol,
+                        currentPrice,
+                        targetPrice: alert.targetPrice,
+                        condition: alert.condition,
+                    });
+                    
+                    const content = `
+                        <div style="padding: 16px;" data-alert-metadata='${alertMetadata}'>
+                            <h3 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600; color: #FDD458;">
+                                ${alert.symbol} Price Alert Triggered
+                            </h3>
+                            <p style="margin: 0 0 8px 0; font-size: 14px; color: #CCDADC;">
+                                <strong>Current Price:</strong> $${currentPrice.toFixed(2)}
+                            </p>
+                            <p style="margin: 0 0 8px 0; font-size: 14px; color: #CCDADC;">
+                                <strong>Target Price:</strong> $${alert.targetPrice.toFixed(2)}
+                            </p>
+                            <p style="margin: 0; font-size: 14px; color: #CCDADC;">
+                                <strong>Condition:</strong> Price ${isUpper ? 'exceeded' : 'dropped below'} your ${isUpper ? 'upper' : 'lower'} threshold
+                            </p>
+                        </div>
+                    `;
+
+                    const notificationResult = await createNotification({
+                        userId: alert.userId,
+                        type: 'PRICE_ALERT',
+                        title,
+                        content,
+                    });
+
+                    console.log(`📬 Price alert notification created for ${alert.symbol}:`, {
+                        alertId: alert._id,
+                        userId: alert.userId,
+                        notificationCreated: notificationResult.success,
+                        shouldSendEmail: notificationResult.data?.shouldSendEmail,
+                        isPending: notificationResult.data?.isPending,
+                    });
+
+                    // Send email immediately if preferences allow (not in quiet hours)
+                    if (notificationResult.success && notificationResult.data?.shouldSendEmail) {
+                        const profile = await UserProfile.findOne({ userId: alert.userId }).lean();
+                        if (profile?.email) {
+                            await sendPriceAlertEmail({
+                                email: profile.email,
+                                symbol: alert.symbol,
+                                company: alert.symbol,
+                                currentPrice,
+                                targetPrice: alert.targetPrice,
+                                condition: alert.condition,
+                            });
+                            console.log(`✉️  Price alert email sent to ${profile.email}`);
+                        }
                     }
                     
-                    return { alertId: alert._id, symbol: alert.symbol, triggered: true };
+                    return { 
+                        alertId: alert._id, 
+                        symbol: alert.symbol, 
+                        triggered: true,
+                        notificationCreated: notificationResult.success,
+                        emailSent: notificationResult.data?.shouldSendEmail || false,
+                    };
                 });
                 results.push({ alertId: alert._id, symbol: alert.symbol, triggered: true });
             }
@@ -309,6 +363,50 @@ export const deliverPendingNotifications = inngest.createFunction(
                                     date,
                                     newsContent: notification.content,
                                 });
+                            } else if (notification.type === 'PRICE_ALERT') {
+                                // Parse price alert data from notification content
+                                // Try to extract from data-alert-metadata attribute first (new format)
+                                let alertData = null;
+                                const metadataMatch = notification.content.match(/data-alert-metadata='({[^']+})'/);
+                                
+                                if (metadataMatch) {
+                                    try {
+                                        alertData = JSON.parse(metadataMatch[1]);
+                                    } catch (e) {
+                                        console.warn('⚠️  Failed to parse alert metadata JSON:', e);
+                                    }
+                                }
+                                
+                                // Fallback to parsing from HTML content (legacy format)
+                                if (!alertData) {
+                                    const contentMatch = notification.content.match(/<strong>Current Price:<\/strong>\s*\$\s*([\d.]+)/);
+                                    const targetMatch = notification.content.match(/<strong>Target Price:<\/strong>\s*\$\s*([\d.]+)/);
+                                    const conditionMatch = notification.content.match(/Price\s+(exceeded|dropped below)/);
+                                    const titleMatch = notification.title.match(/Price Alert:\s*(\w+)\s+(Above|Below)/);
+                                    
+                                    if (contentMatch && targetMatch && conditionMatch && titleMatch) {
+                                        alertData = {
+                                            symbol: titleMatch[1],
+                                            currentPrice: parseFloat(contentMatch[1]),
+                                            targetPrice: parseFloat(targetMatch[1]),
+                                            condition: conditionMatch[1] === 'exceeded' ? 'ABOVE' : 'BELOW',
+                                        };
+                                    }
+                                }
+                                
+                                if (alertData && alertData.symbol && alertData.currentPrice && alertData.targetPrice && alertData.condition) {
+                                    await sendPriceAlertEmail({
+                                        email: profile.email,
+                                        symbol: alertData.symbol,
+                                        company: alertData.symbol,
+                                        currentPrice: alertData.currentPrice,
+                                        targetPrice: alertData.targetPrice,
+                                        condition: alertData.condition,
+                                    });
+                                    console.log(`✉️  Price alert email sent to ${profile.email} (from pending notification)`);
+                                } else {
+                                    console.warn('⚠️  Could not parse price alert data from notification content:', notification._id);
+                                }
                             }
                         }
                     }

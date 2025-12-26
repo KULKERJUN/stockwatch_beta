@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { 
     getUserPriceAlerts, 
     deletePriceAlert, 
-    togglePriceAlertStatus 
+    togglePriceAlertStatus,
+    checkPriceAlertsManually
 } from '@/lib/actions/alert.actions';
 import { toast } from 'sonner';
 import { 
@@ -15,7 +16,8 @@ import {
     TrendingUp, 
     TrendingDown,
     AlertCircle,
-    CheckCircle2
+    CheckCircle2,
+    RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +42,7 @@ interface Alert {
 const AlertsList = () => {
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [loading, setLoading] = useState(true);
+    const [checking, setChecking] = useState(false);
 
     const loadAlerts = async () => {
         setLoading(true);
@@ -97,6 +100,29 @@ const AlertsList = () => {
         }
     };
 
+    const handleCheckNow = async () => {
+        setChecking(true);
+        try {
+            const result = await checkPriceAlertsManually();
+            if (result.success) {
+                if (result.triggeredCount && result.triggeredCount > 0) {
+                    toast.success(`${result.triggeredCount} alert(s) triggered! Check your notifications.`);
+                } else {
+                    toast.info('No alerts triggered. Prices checked successfully.');
+                }
+                // Reload alerts to show updated status
+                await loadAlerts();
+            } else {
+                toast.error(result.error || 'Failed to check alerts');
+            }
+        } catch (error) {
+            console.error('Error checking alerts:', error);
+            toast.error('Failed to check alerts');
+        } finally {
+            setChecking(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center py-12">
@@ -119,9 +145,33 @@ const AlertsList = () => {
         );
     }
 
+    const hasActiveAlerts = alerts.some(a => a.status === 'ACTIVE');
+
     return (
-        <div className="grid gap-4">
-            {alerts.map((alert) => (
+        <div className="space-y-4">
+            {hasActiveAlerts && (
+                <div className="flex justify-end">
+                    <Button
+                        onClick={handleCheckNow}
+                        disabled={checking}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-black font-medium"
+                    >
+                        {checking ? (
+                            <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Checking...
+                            </>
+                        ) : (
+                            <>
+                                <RefreshCw className="h-4 w-4 mr-2" />
+                                Check Now
+                            </>
+                        )}
+                    </Button>
+                </div>
+            )}
+            <div className="grid gap-4">
+                {alerts.map((alert) => (
                 <Card key={alert._id} className="bg-gray-900 border-gray-800 hover:border-gray-700 transition-colors overflow-hidden">
                     <CardContent className="p-0">
                         <div className="flex items-center justify-between p-4 sm:p-6">
@@ -198,7 +248,8 @@ const AlertsList = () => {
                         </div>
                     </CardContent>
                 </Card>
-            ))}
+                ))}
+            </div>
         </div>
     );
 };
