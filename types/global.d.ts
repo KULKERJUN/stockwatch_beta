@@ -231,6 +231,7 @@ declare global {
     // User types for email functions
     type UserForNewsEmail = {
         id: string;
+        userId: string;
         email: string;
         name: string;
     };
@@ -240,6 +241,31 @@ declare global {
         alertType: 'upper' | 'lower';
         threshold: number;
         symbol?: string;
+    };
+
+    // Notification types
+    type NotificationType = 'DAILY_NEWS_SUMMARY' | 'PRICE_ALERT' | 'SYSTEM';
+
+    type NotificationStatus = 'PENDING' | 'DELIVERED';
+
+    type NotificationPreferences = {
+        emailEnabled: boolean;
+        inAppEnabled: boolean;
+        quietHoursEnabled: boolean;
+        quietStart: string;
+        quietEnd: string;
+    };
+
+    type Notification = {
+        id: string;
+        userId: string;
+        type: NotificationType;
+        title: string;
+        content: string;
+        status: NotificationStatus;
+        deliverAfter: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
     };
 }
 

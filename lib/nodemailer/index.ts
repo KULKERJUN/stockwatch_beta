@@ -33,19 +33,47 @@ export const sendWelcomeEmail = async ({ email, name, intro }: WelcomeEmailData)
 export const sendNewsSummaryEmail = async (
     { email, date, newsContent }: { email: string; date: string; newsContent: string }
 ): Promise<void> => {
-    const htmlTemplate = NEWS_SUMMARY_EMAIL_TEMPLATE
-        .replace('{{date}}', date)
-        .replace('{{newsContent}}', newsContent);
+    try {
+        console.log('📧 Attempting to send email to:', email);
+        console.log('📧 SMTP Config:', {
+            service: 'gmail',
+            user: process.env.NODEMAILER_EMAIL ? '✓ Set' : '✗ Missing',
+            pass: process.env.NODEMAILER_PASSWORD ? '✓ Set' : '✗ Missing',
+        });
 
-    const mailOptions = {
-        from: `"StockWatch News" <${process.env.NODEMAILER_EMAIL}>`,
-        to: email,
-        subject: `📈 Market News Summary Today - ${date}`,
-        text: `Today's market news summary from StockWatch page!`,
-        html: htmlTemplate,
-    };
+        const htmlTemplate = NEWS_SUMMARY_EMAIL_TEMPLATE
+            .replace('{{date}}', date)
+            .replace('{{newsContent}}', newsContent);
 
-    await transporter.sendMail(mailOptions);
+        const mailOptions = {
+            from: `"StockWatch News" <${process.env.NODEMAILER_EMAIL}>`,
+            to: email,
+            subject: `📈 Market News Summary Today - ${date}`,
+            text: `Today's market news summary from StockWatch page!`,
+            html: htmlTemplate,
+        };
+
+        const info = await transporter.sendMail(mailOptions);
+
+        console.log('✅ Email sent successfully:', {
+            messageId: info.messageId,
+            to: email,
+            response: info.response,
+            accepted: info.accepted,
+            rejected: info.rejected,
+        });
+    } catch (error: any) {
+        console.error('❌ Failed to send email:', {
+            to: email,
+            error: error.message,
+            code: error.code,
+            command: error.command,
+            responseCode: error.responseCode,
+            response: error.response,
+        });
+        // Don't throw - we don't want to break notification creation if email fails
+        // throw error;
+    }
 };
 
 export const sendPriceAlertEmail = async ({

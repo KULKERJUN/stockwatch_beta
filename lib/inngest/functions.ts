@@ -8,7 +8,9 @@ import { getFormattedTodayDate } from "@/lib/utils";
 import { connectToDatabase } from "@/database/mongoose";
 import PriceAlert from "@/database/models/PriceAlert";
 import UserProfile from "@/database/models/UserProfile";
+import Notification from "@/database/models/Notification";
 import { getMultipleStockPrices } from "@/lib/actions/stock.actions";
+import { createNotification, getNotificationPreferencesByUserId } from "@/lib/actions/notification.actions";
 import { generateText } from 'ai';
 import { openai } from '@ai-sdk/openai';
 
@@ -54,12 +56,24 @@ export const sendSignUpEmail = inngest.createFunction(
 
 export const sendDailyNewsSummary = inngest.createFunction(
     { id: 'daily-news-summary' },
-    [ { event: 'app/send.daily.news' }, { cron: '0 */10 * * *' } ],
+    [ { event: 'app/send.daily.news' }, { cron: '*/6 * * * *' } ],
     async ({ step }) => {
         // Step #1: Get all users for news delivery
-        const users = await step.run('get-all-users', getAllUsersForNewsEmail)
+        const users = await step.run('get-all-users', async () => {
+            const allUsers = await getAllUsersForNewsEmail();
+            console.log('📊 Daily News Summary - Users Found:', {
+                count: allUsers.length,
+                users: allUsers.map(u => ({ id: u.id, userId: u.userId, email: u.email }))
+            });
+            return allUsers;
+        });
 
-        if(!users || users.length === 0) return { success: false, message: 'No users found for news email' };
+        if(!users || users.length === 0) {
+            console.log('⚠️  No users found for news email');
+            return { success: false, message: 'No users found for news email' };
+        }
+
+        console.log(`✅ Processing news for ${users.length} user(s)`);
 
         // Step #2: For each user, get watchlist symbols -> fetch news (fallback to general)
         const results = await step.run('fetch-user-news', async () => {
@@ -75,6 +89,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
                         articles = await getNews();
                         articles = (articles || []).slice(0, 6);
                     }
+                    console.log(`📰 Fetched ${articles.length} articles for ${user.email}`);
                     perUser.push({ user, articles });
                 } catch (e) {
                     console.error('daily-news: error preparing user news', user.email, e);
@@ -90,6 +105,7 @@ export const sendDailyNewsSummary = inngest.createFunction(
         for (const { user, articles } of results) {
             const newsContent = await step.run(`summarize-news-${user.email}`, async () => {
                 try {
+                    console.log(`🤖 Summarizing ${articles.length} articles for ${user.email}`);
                     const prompt = NEWS_SUMMARY_EMAIL_PROMPT.replace('{{newsData}}', JSON.stringify(articles, null, 2));
 
                     const { text } = await generateText({
@@ -97,9 +113,11 @@ export const sendDailyNewsSummary = inngest.createFunction(
                         prompt: prompt,
                     });
 
-                    return text || 'No market news.';
+                    const summary = text || 'No market news.';
+                    console.log(`✅ Summary generated for ${user.email} (${summary.length} chars)`);
+                    return summary;
                 } catch (error) {
-                    console.error('Failed to summarize news for:', user.email, error);
+                    console.error('❌ Failed to summarize news for:', user.email, error);
                     return null;
                 }
             });
@@ -107,18 +125,62 @@ export const sendDailyNewsSummary = inngest.createFunction(
             userNewsSummaries.push({ user, newsContent });
         }
 
-        // Step #4: (placeholder) Send the emails
-        await step.run('send-news-emails', async () => {
-            await Promise.all(
+        // Step #4: Create notifications and send emails based on preferences
+        const deliveryResults = await step.run('deliver-notifications', async () => {
+            const results = await Promise.all(
                 userNewsSummaries.map(async ({ user, newsContent}) => {
-                    if(!newsContent) return false;
+                    if(!newsContent) {
+                        console.log(`⚠️  No content for ${user.email}, skipping`);
+                        return { email: user.email, success: false, reason: 'No content' };
+                    }
 
-                    return await sendNewsSummaryEmail({ email: user.email, date: getFormattedTodayDate(), newsContent })
+                    try {
+                        console.log(`📤 Delivering to ${user.email} (userId: ${user.userId})`);
+
+                        // Create notification (handles quiet hours internally)
+                        const result = await createNotification({
+                            userId: user.userId,
+                            type: 'DAILY_NEWS_SUMMARY',
+                            title: `Market News Summary - ${getFormattedTodayDate()}`,
+                            content: newsContent,
+                        });
+
+                        console.log(`📬 Notification result for ${user.email}:`, result);
+
+                        // Send email if preferences allow and not in quiet hours
+                        if (result.success && result.data?.shouldSendEmail) {
+                            await sendNewsSummaryEmail({
+                                email: user.email,
+                                date: getFormattedTodayDate(),
+                                newsContent
+                            });
+                            console.log(`✉️  Email sent to ${user.email}`);
+                            return { email: user.email, success: true, emailSent: true, notificationCreated: true };
+                        }
+
+                        return {
+                            email: user.email,
+                            success: true,
+                            emailSent: false,
+                            notificationCreated: result.success,
+                            reason: result.data?.isPending ? 'Quiet hours - pending' : 'Email disabled'
+                        };
+                    } catch (error) {
+                        console.error('❌ Error delivering notification to:', user.email, error);
+                        return { email: user.email, success: false, error: String(error) };
+                    }
                 })
-            )
-        })
+            );
+            return results;
+        });
 
-        return { success: true, message: 'Daily news summary emails sent successfully' }
+        console.log('📊 Final Summary:', deliveryResults);
+
+        return {
+            success: true,
+            message: 'Daily news summary notifications processed successfully',
+            results: deliveryResults
+        };
     }
 )
 
@@ -187,3 +249,92 @@ export const checkPriceAlerts = inngest.createFunction(
     }
 );
 
+export const deliverPendingNotifications = inngest.createFunction(
+    { id: 'deliver-pending-notifications' },
+    { cron: '*/10 * * * *' }, // Run every 10 minutes
+    async ({ step }) => {
+        const pendingNotifications = await step.run('fetch-pending-notifications', async () => {
+            await connectToDatabase();
+            const now = new Date();
+            return await Notification.find({
+                status: 'PENDING',
+                deliverAfter: { $lte: now },
+            }).lean();
+        });
+
+        if (pendingNotifications.length === 0) {
+            return { message: 'No pending notifications to deliver' };
+        }
+
+        const results = await step.run('deliver-notifications', async () => {
+            const deliveryResults = [];
+
+            for (const notification of pendingNotifications) {
+                try {
+                    // Get user preferences
+                    const prefsResult = await getNotificationPreferencesByUserId(notification.userId);
+
+                    if (!prefsResult.success || !prefsResult.data) {
+                        continue;
+                    }
+
+                    const prefs = prefsResult.data;
+
+                    // Mark as delivered if in-app is enabled
+                    if (prefs.inAppEnabled) {
+                        await Notification.findByIdAndUpdate(notification._id, {
+                            status: 'DELIVERED',
+                            deliverAfter: null,
+                        });
+                    } else {
+                        // If in-app disabled, just remove from pending queue
+                        await Notification.findByIdAndDelete(notification._id);
+                    }
+
+                    // Send email if enabled
+                    if (prefs.emailEnabled) {
+                        const profile = await UserProfile.findOne({ userId: notification.userId }).lean();
+
+                        if (profile?.email) {
+                            if (notification.type === 'DAILY_NEWS_SUMMARY') {
+                                const date = notification.createdAt.toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                });
+
+                                await sendNewsSummaryEmail({
+                                    email: profile.email,
+                                    date,
+                                    newsContent: notification.content,
+                                });
+                            }
+                        }
+                    }
+
+                    deliveryResults.push({
+                        notificationId: notification._id,
+                        userId: notification.userId,
+                        delivered: true,
+                    });
+                } catch (error) {
+                    console.error('Error delivering notification:', notification._id, error);
+                    deliveryResults.push({
+                        notificationId: notification._id,
+                        userId: notification.userId,
+                        delivered: false,
+                        error: String(error),
+                    });
+                }
+            }
+
+            return deliveryResults;
+        });
+
+        return {
+            message: `Delivered ${results.filter((r: any) => r.delivered).length} of ${pendingNotifications.length} pending notifications`,
+            results,
+        };
+    }
+);

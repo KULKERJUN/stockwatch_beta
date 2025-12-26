@@ -138,3 +138,63 @@ export const getFormattedTodayDate = () => new Date().toLocaleDateString('en-US'
     timeZone: 'UTC',
 });
 
+/**
+ * Check if current time is within quiet hours
+ * @param now - Current date/time
+ * @param startHHMM - Start time in HH:MM format (e.g., "22:00")
+ * @param endHHMM - End time in HH:MM format (e.g., "07:00")
+ * @returns true if current time is within quiet hours
+ */
+export const isWithinQuietHours = (now: Date, startHHMM: string, endHHMM: string): boolean => {
+    const [startHour, startMin] = startHHMM.split(':').map(Number);
+    const [endHour, endMin] = endHHMM.split(':').map(Number);
+
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+
+    // Handle overnight quiet hours (e.g., 22:00 to 07:00)
+    if (startMinutes > endMinutes) {
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes;
+    }
+
+    // Handle same-day quiet hours (e.g., 01:00 to 05:00)
+    return currentMinutes >= startMinutes && currentMinutes < endMinutes;
+};
+
+/**
+ * Calculate when quiet hours will end
+ * @param now - Current date/time
+ * @param startHHMM - Start time in HH:MM format
+ * @param endHHMM - End time in HH:MM format
+ * @returns Date object representing when to deliver the notification
+ */
+export const computeDeliverAfter = (now: Date, startHHMM: string, endHHMM: string): Date => {
+    const [endHour, endMin] = endHHMM.split(':').map(Number);
+    const [startHour, startMin] = startHHMM.split(':').map(Number);
+
+    const deliverDate = new Date(now);
+    deliverDate.setHours(endHour, endMin, 0, 0);
+
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+
+    // If quiet hours span overnight and we're before end time, deliver today
+    if (startMinutes > endMinutes && now.getHours() * 60 + now.getMinutes() < endMinutes) {
+        return deliverDate;
+    }
+
+    // If quiet hours span overnight and we're after start time, deliver tomorrow
+    if (startMinutes > endMinutes && now.getHours() * 60 + now.getMinutes() >= startMinutes) {
+        deliverDate.setDate(deliverDate.getDate() + 1);
+        return deliverDate;
+    }
+
+    // If end time has passed today, deliver tomorrow
+    if (deliverDate <= now) {
+        deliverDate.setDate(deliverDate.getDate() + 1);
+    }
+
+    return deliverDate;
+};
+
