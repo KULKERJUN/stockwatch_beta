@@ -28,7 +28,7 @@ const NotificationsPage = async () => {
             createdAt: new Date(n.createdAt).toISOString(),
         })) || []
         : [];
-    const preferences = preferencesResult.success ? preferencesResult.data : null;
+    const preferences = preferencesResult.success && preferencesResult.data ? preferencesResult.data : null;
 
     return (
         <div className="flex-1 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen">
